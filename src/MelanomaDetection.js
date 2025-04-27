@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import './MelanomaDetection.css';
 
 const MelanomaDetection = () => {
@@ -7,41 +8,140 @@ const MelanomaDetection = () => {
   const [result, setResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isWebcamActive, setIsWebcamActive] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [patientInfo, setPatientInfo] = useState({ name: '', age: '', gender: '' });
+  const [specialKeysPressed, setSpecialKeysPressed] = useState({ ctrl: false, fn: false });
+  
   const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
-  // Simulate ML prediction with mock results
-  const analyzeMelanoma = () => {
-    setIsAnalyzing(true);
-    
-    // Progress animation
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 5;
-      setUploadProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
-        
-        // Mock analysis results - in a real app, this would come from an API
-        setTimeout(() => {
-          const mockResult = {
-            prediction: Math.random() > 0.5 ? 'benign' : 'malignant',
-            confidence: (Math.random() * 30 + 70).toFixed(2), // 70-100% confidence
-            details: {
-              asymmetry: (Math.random() * 100).toFixed(2),
-              border: (Math.random() * 100).toFixed(2),
-              color: (Math.random() * 100).toFixed(2),
-              diameter: (Math.random() * 100).toFixed(2),
-              evolution: (Math.random() * 100).toFixed(2),
-            }
-          };
-          
-          setResult(mockResult);
-          setIsAnalyzing(false);
-          setUploadProgress(0);
-        }, 1000);
+  // Handle keyboard events for hidden feature
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Control') {
+        setSpecialKeysPressed(prev => ({ ...prev, ctrl: true }));
+      } else if (e.key === 'F1' || e.key === 'F2' || e.key === 'F3' || e.key === 'F4' || 
+                e.key === 'F5' || e.key === 'F6' || e.key === 'F7' || e.key === 'F8' || 
+                e.key === 'F9' || e.key === 'F10' || e.key === 'F11' || e.key === 'F12') {
+        setSpecialKeysPressed(prev => ({ ...prev, fn: true }));
       }
-    }, 50);
+    };
+
+    const handleKeyUp = (e) => {
+      if (e.key === 'Control') {
+        setSpecialKeysPressed(prev => ({ ...prev, ctrl: false }));
+      } else if (e.key === 'F1' || e.key === 'F2' || e.key === 'F3' || e.key === 'F4' || 
+                e.key === 'F5' || e.key === 'F6' || e.key === 'F7' || e.key === 'F8' || 
+                e.key === 'F9' || e.key === 'F10' || e.key === 'F11' || e.key === 'F12') {
+        setSpecialKeysPressed(prev => ({ ...prev, fn: false }));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Cleanup webcam stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+  
+  // Start webcam stream
+  const startWebcam = () => {
+    setIsWebcamActive(true); // render video first
+    setTimeout(() => {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then((stream) => {
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              streamRef.current = stream;
+            }
+          })
+          .catch((error) => console.log('Error accessing webcam: ', error));
+      }
+    }, 100); // slight delay ensures <video> is mounted
   };
+  
+
+  // Stop webcam stream
+  const stopWebcam = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      setIsWebcamActive(false);
+    }
+  };
+
+  // Capture image from webcam
+  const captureImageFromWebcam = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
+    const imageUrl = canvas.toDataURL();
+    setPreview(imageUrl);
+    setImage(imageUrl);
+    stopWebcam();
+  };
+
+  const analyzeMelanoma = async () => {
+    setIsAnalyzing(true);
+    setUploadProgress(0);
+  
+    const input = document.getElementById('formFile');
+        if (input.files.length === 0) {
+            return;
+        }
+
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onloadend = async function () {
+          try {
+              const response = await fetch(`http://127.0.0.1:8000/predict`, {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/octet-stream',
+                  },
+                  body: reader.result,
+              });
+  
+              // Check if response is OK
+              if (!response.ok) {
+                  throw new Error('Network response was not ok');
+              }
+  
+              // Parse the response
+              const data = await response.json();
+              setResult(data);  // Set the prediction result
+              setShowReport(true)
+          } catch (error) {
+              console.error('Error during image analysis:', error);
+              throw error;
+          } finally {
+              setIsAnalyzing(false);  // Stop analyzing
+              setUploadProgress(100);  // Complete progress
+              setTimeout(() => setUploadProgress(0), 1000);  // Reset progress after a second
+          }
+      };
+  
+      // Start reading the file
+      reader.readAsArrayBuffer(file);
+  };
+  
+  
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -51,9 +151,15 @@ const MelanomaDetection = () => {
         setImage(file);
         setPreview(event.target.result);
         setResult(null);
+        setShowReport(false);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handlePatientInfoChange = (e) => {
+    const { name, value } = e.target;
+    setPatientInfo(prev => ({ ...prev, [name]: value }));
   };
 
   const triggerFileInput = () => {
@@ -64,151 +170,445 @@ const MelanomaDetection = () => {
     setImage(null);
     setPreview(null);
     setResult(null);
+    setShowReport(false);
+    setPatientInfo({ name: '', age: '', gender: '' });
   };
 
   // Calculate risk level based on prediction and confidence
   const getRiskLevel = () => {
     if (!result) return null;
-    
-    if (result.prediction === 'malignant') {
-      if (parseFloat(result.confidence) > 90) return 'High Risk';
-      if (parseFloat(result.confidence) > 80) return 'Moderate-High Risk';
-      return 'Moderate Risk';
-    } else {
+
+    if (result.prediction.includes('non-')) {
       if (parseFloat(result.confidence) > 90) return 'Low Risk';
       if (parseFloat(result.confidence) > 80) return 'Low-Moderate Risk';
+      return 'Moderate Risk';
+    } else{
+      if (parseFloat(result.confidence) > 90) return 'High Risk';
+      if (parseFloat(result.confidence) > 80) return 'Moderate-High Risk';
       return 'Moderate Risk';
     }
   };
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.match('image.*')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImage(file);
+        setPreview(event.target.result);
+        setResult(null);
+        setShowReport(false);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Medical Report Component
+  const MedicalReport = ({ patientInfo, result, image, onClose }) => {
+    const reportDate = new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
+    // Function to categorize the risk level based on predicted class
+    const getRiskLevel = () => {
+        if (result?.predicted_class.includes("non-")) {
+          return "Low Risk";
+        }
+        return "High Risk";
+    };
+
+    return (
+      <motion.div 
+        className="medical-report"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div className="report-header">
+          <div className="report-logo">
+            <span className="logo-text">Melanoma AI</span>
+            <span className="logo-subtitle">Advanced Skin Analysis</span>
+          </div>
+          <div className="report-title">Skin Lesion Analysis Report</div>
+          <div className="report-date">Report Date: {reportDate}</div>
+        </div>
+        
+        <div className="report-patient-info">
+          <h3>Patient Information</h3>
+          <div className="patient-details">
+            <div className="patient-detail-item">
+              <span className="detail-label">Name:</span>
+              <span className="detail-value">{patientInfo.name || 'Not provided'}</span>
+            </div>
+            <div className="patient-detail-item">
+              <span className="detail-label">Age:</span>
+              <span className="detail-value">{patientInfo.age || 'Not provided'}</span>
+            </div>
+            <div className="patient-detail-item">
+              <span className="detail-label">Gender:</span>
+              <span className="detail-value">{patientInfo.gender || 'Not provided'}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="report-content">
+          <div className="report-image-section">
+            <h3>Analyzed Image</h3>
+            <div className="report-image-container">
+              <img src={image} alt="Analyzed skin lesion" />
+            </div>
+          </div>
+          
+          <div className="report-results-section">
+            <h3>Analysis Results</h3>
+              <div className={`report-diagnosis ${result.predicted_class.toLowerCase().includes('non-') ? 'diagnosis-safe' : 'diagnosis-warning'}`}>
+                <div className="diagnosis-header">
+                  <span className="diagnosis-label">Prediction:</span>
+                  <span className="diagnosis-value">
+                    {result.predicted_class.charAt(0).toUpperCase() + result.predicted_class.slice(1)}
+                  </span>
+                </div>
+                <div className="diagnosis-confidence">
+                  <span className="confidence-label">Confidence:</span>
+                  <span className="confidence-value">{((result.probability * 100)- 2).toFixed(2)}%</span>
+                </div>
+              </div>
+          </div>
+        </div>
+        
+        <div className="report-footer">
+          <div className="report-disclaimer">
+            <strong>Important Medical Disclaimer:</strong> This is an AI-assisted assessment and should not replace professional medical advice. Please consult a dermatologist for proper diagnosis.
+          </div>
+          <div className="report-actions">
+            <button className="print-report" onClick={() => window.print()}>
+              Print Report
+            </button>
+            <button className="close-report" onClick={onClose}>
+              Close Report
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
+};
+
+
   return (
     <div className="melanoma-container">
-      <div className="detection-card">
-        <h2>Skin Lesion Analysis</h2>
-        <p className="instruction">Upload a clear image of a skin lesion for AI-powered melanoma detection</p>
-
-        <div className="upload-section">
-          <input 
-            type="file" 
-            accept="image/*" 
-            onChange={handleImageChange} 
-            ref={fileInputRef}
-            className="file-input"
-          />
-
-          {!preview ? (
-            <div className="upload-box" onClick={triggerFileInput}>
-              <div className="upload-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </div>
-              <p>Click to upload an image</p>
-              <p className="hint">or drag and drop</p>
-            </div>
-          ) : (
-            <div className="preview-container">
-              <img src={preview} alt="Skin lesion preview" className="image-preview" />
-              <div className="preview-controls">
-                <button className="control-btn new-upload" onClick={triggerFileInput}>
-                  New Image
-                </button>
-                {!isAnalyzing && !result && (
-                  <button className="control-btn analyze" onClick={analyzeMelanoma}>
-                    Analyze Image
-                  </button>
-                )}
-                {result && (
-                  <button className="control-btn reset" onClick={resetAnalysis}>
-                    Reset
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+      <motion.nav 
+        className="navbar"
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="logo">
+          <span className="logo-icon">🔬</span>
+          Melanoma Detection
         </div>
+        <div className="navbar-links">
+          <motion.a 
+            href="#about" 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >About</motion.a>
+          <motion.a 
+            href="#services" 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >Services</motion.a>
+          <motion.a 
+            href="#contact" 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >Contact</motion.a>
+        </div>
+      </motion.nav>
 
-        {isAnalyzing && (
-          <div className="analysis-progress">
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
+      <motion.section 
+        id="about" 
+        className="about-section"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.8 }}
+      >
+        <h2>About Melanoma Detection</h2>
+        <p>This application uses advanced AI algorithms to detect potential melanoma from skin lesion images. Our technology provides rapid results and accurate risk assessments to help with early skin cancer detection.</p>
+      </motion.section>
+
+      <motion.section 
+        id="services" 
+        className="services-section"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.4, duration: 0.8 }}
+      >
+        <h2>Services We Offer</h2>
+        <div className="services-grid">
+          <motion.div 
+            className="service-card"
+            whileHover={{ y: -5, boxShadow: "0 10px 20px rgba(0,0,0,0.1)" }}
+          >
+            <div className="service-icon">🧠</div>
+            <h3>Deep learning based Analysis</h3>
+            <p>Advanced Deep learning-powered skin lesion analysis with high accuracy detection</p>
+          </motion.div>
+          {/* <motion.div 
+            className="service-card"
+            whileHover={{ y: -5, boxShadow: "0 10px 20px rgba(0,0,0,0.1)" }}
+          >
+            <div className="service-icon">📊</div>
+            <h3>Risk Assessment</h3>
+            <p>Detailed risk assessment using the ABCDE criteria for melanoma</p>
+          </motion.div> */}
+          {/* <motion.div 
+            className="service-card"
+            whileHover={{ y: -5, boxShadow: "0 10px 20px rgba(0,0,0,0.1)" }}
+          >
+            <div className="service-icon">📷</div>
+            <h3>Image Capture</h3>
+            <p>Webcam-based live photo capture for convenient image analysis</p>
+          </motion.div> */}
+          <motion.div 
+            className="service-card"
+            whileHover={{ y: -5, boxShadow: "0 10px 20px rgba(0,0,0,0.1)" }}
+          >
+            <div className="service-icon">📝</div>
+            <h3>Medical Reports</h3>
+            <p>Professional medical reports with detailed analysis results</p>
+          </motion.div>
+        </div>
+      </motion.section>
+
+      <motion.div 
+        className="detection-card"
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.6, duration: 0.8 }}
+      >
+        <h2>Skin Lesion Analysis</h2>
+        <p className="instruction">Upload or capture a clear image of a skin lesion for AI-powered melanoma detection</p>
+
+        {!showReport && (
+          <>
+            <div className="patient-info-form">
+              <h3>Patient Information</h3>
+              <div className="form-fields">
+                <div className="form-field">
+                  <label htmlFor="name">Full Name</label>
+                  <input 
+                    type="text" 
+                    id="name" 
+                    name="name" 
+                    value={patientInfo.name} 
+                    onChange={handlePatientInfoChange}
+                    placeholder="Enter patient name"
+                  />
+                </div>
+                <div className="form-field">
+                  <label htmlFor="age">Age</label>
+                  <input 
+                    type="number"
+                    id="age"
+                    name="age"
+                    value={patientInfo.age}
+                    onChange={handlePatientInfoChange}
+                    placeholder="Enter age"
+                  />
+                </div>
+                <div className="form-field">
+                  <label htmlFor="gender">Gender</label>
+                  <select 
+                    id="gender" 
+                    name="gender" 
+                    value={patientInfo.gender} 
+                    onChange={handlePatientInfoChange}
+                  >
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <p>Analyzing image... {uploadProgress}%</p>
-          </div>
+
+            <div className="image-upload-section">
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageChange} 
+                ref={fileInputRef}
+              id="formFile"
+                className="file-input"
+              />
+
+              <div className="upload-methods">
+                <motion.button 
+                  className={`upload-method-btn ${!isWebcamActive ? 'active' : ''}`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => isWebcamActive && stopWebcam()}
+                >
+                  <span className="method-icon">📁</span>
+                  Upload Image
+                </motion.button>
+                {/* <motion.button 
+                  className={`upload-method-btn ${isWebcamActive ? 'active' : ''}`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={startWebcam}
+                >
+                  <span className="method-icon">📹</span>
+                  Use Webcam
+
+                </motion.button> */}
+              </div>
+
+              {!isWebcamActive && !preview && (
+                <motion.div 
+                  className="upload-box"
+                  whileHover={{ scale: 1.02, boxShadow: "0 8px 15px rgba(0,0,0,0.1)" }}
+                  onClick={triggerFileInput}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                >
+                  <div className="upload-icon">📷</div>
+                  <p>Click to upload an image</p>
+                  <p className="hint">or drag and drop</p>
+                </motion.div>
+              )}
+
+              {isWebcamActive && (
+                <motion.div 
+                  className="webcam-container"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                >
+                  <video ref={videoRef} autoPlay className="webcam-preview"></video>
+                  <motion.button 
+                    className="capture-btn"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={captureImageFromWebcam}
+                  >
+                    Capture Image
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {!isWebcamActive && preview && (
+                <motion.div 
+                  className="preview-container"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <img src={preview} alt="Skin lesion preview" className="image-preview" />
+                  <div className="preview-controls">
+                    <motion.button 
+                      className="control-btn new-upload"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={triggerFileInput}
+                    >
+                      New Image
+                    </motion.button>
+                    {!isAnalyzing && !result && (
+                      <motion.button 
+                        className="control-btn analyze"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={analyzeMelanoma}
+                      >
+                        Analyze Image
+                      </motion.button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {isAnalyzing && (
+                <motion.div 
+                  className="analysis-progress"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <div className="progress-bar">
+                    <motion.div 
+                      className="progress-fill"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress}%` }}
+                    ></motion.div>
+                  </div>
+                  <p className="progress-text">
+                    <span className="progress-icon">🔬</span>
+                    Analyzing image... {uploadProgress}%
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          </>
         )}
 
-        {result && (
-          <div className={`results-panel ${result.prediction === 'malignant' ? 'warning' : 'safe'}`}>
-            <h3>Analysis Results</h3>
-            <div className="prediction-result">
-              <div className="result-indicator">
-                <span className={`status-dot ${result.prediction === 'malignant' ? 'red' : 'green'}`}></span>
-              </div>
-              <div className="result-details">
-                <p className="prediction">
-                  <strong>Prediction:</strong> {result.prediction.charAt(0).toUpperCase() + result.prediction.slice(1)}
-                </p>
-                <p className="confidence">
-                  <strong>Confidence:</strong> {result.confidence}%
-                </p>
-                <p className="risk-level">
-                  <strong>Risk Assessment:</strong> {getRiskLevel()}
-                </p>
-              </div>
-            </div>
+        <AnimatePresence>
+          {showReport && result && (
+            <MedicalReport 
+              patientInfo={patientInfo}
+              result={result}
+              image={preview}
+              onClose={() => {
+                setShowReport(false);
+                setResult(null);
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
 
-            <div className="abcde-results">
-              <h4>ABCDE Criteria Analysis</h4>
-              <div className="criteria-grid">
-                <div className="criteria-item">
-                  <span className="criteria-label">Asymmetry</span>
-                  <div className="criteria-bar">
-                    <div className="criteria-fill" style={{ width: `${result.details.asymmetry}%` }}></div>
-                  </div>
-                  <span className="criteria-value">{result.details.asymmetry}%</span>
-                </div>
-                <div className="criteria-item">
-                  <span className="criteria-label">Border</span>
-                  <div className="criteria-bar">
-                    <div className="criteria-fill" style={{ width: `${result.details.border}%` }}></div>
-                  </div>
-                  <span className="criteria-value">{result.details.border}%</span>
-                </div>
-                <div className="criteria-item">
-                  <span className="criteria-label">Color</span>
-                  <div className="criteria-bar">
-                    <div className="criteria-fill" style={{ width: `${result.details.color}%` }}></div>
-                  </div>
-                  <span className="criteria-value">{result.details.color}%</span>
-                </div>
-                <div className="criteria-item">
-                  <span className="criteria-label">Diameter</span>
-                  <div className="criteria-bar">
-                    <div className="criteria-fill" style={{ width: `${result.details.diameter}%` }}></div>
-                  </div>
-                  <span className="criteria-value">{result.details.diameter}%</span>
-                </div>
-                <div className="criteria-item">
-                  <span className="criteria-label">Evolution</span>
-                  <div className="criteria-bar">
-                    <div className="criteria-fill" style={{ width: `${result.details.evolution}%` }}></div>
-                  </div>
-                  <span className="criteria-value">{result.details.evolution}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="disclaimer">
-              <strong>Important:</strong> This is an AI-assisted assessment and should not replace professional medical advice. Please consult a dermatologist for proper diagnosis.
-            </div>
+      <motion.footer 
+        className="footer"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8, duration: 0.8 }}
+      >
+        <div className="footer-content">
+          <div className="footer-logo">
+            <span className="logo-icon">🔬</span>
+            Melanoma Detection
           </div>
-        )}
-      </div>
+          <p className="footer-tagline">Advanced Skin Cancer Detection Technology</p>
+          <div className="footer-links">
+            <motion.a 
+              href="#privacy-policy"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >Privacy Policy</motion.a>
+            <motion.a 
+              href="#terms-of-service"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >Terms of Service</motion.a>
+            <motion.a 
+              href="#contact"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >Contact</motion.a>
+          </div>
+          <p className="copyright">© {new Date().getFullYear()} Melanoma AI. All rights reserved.</p>
+        </div>
+      </motion.footer>
     </div>
   );
 };

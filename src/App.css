@@ -79,3 +79,8 @@ body {
     padding: 1rem 1.5rem;
   }
 }
+
+.app-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #eef2f7 100%);
+}

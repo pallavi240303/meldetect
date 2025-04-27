@@ -1,70 +1,98 @@
-# Getting Started with Create React App
+# Skin Cancer Detection Project
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This repository contains a machine learning project for skin cancer detection using deep learning techniques.
 
-## Available Scripts
+## Project Overview
 
-In the project directory, you can run:
+This project implements a skin cancer detection system using Python and deep learning. It provides a web interface for users to upload skin images and get predictions about potential skin cancer conditions.
 
-### `npm start`
+## Prerequisites
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- Python 3.9 or higher
+- pip (Python package installer)
+- Virtual environment (recommended)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Getting Started
 
-### `npm test`
+### Clone the Repository
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+git clone https://github.com/abdulsaheel/melanoma-skin-detection.git
+cd melanoma-skin-detection
+```
 
-### `npm run build`
+### Setting Up Virtual Environment
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. Create a virtual environment:
+```bash
+python3 -m venv env
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+2. Activate the virtual environment:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+For macOS/Linux:
+```bash
+source env/bin/activate
+```
 
-### `npm run eject`
+For Windows:
+```bash
+.\env\Scripts\activate
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Installing Dependencies
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Install all required packages using pip:
+```bash
+pip install -r requirements.txt
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+This will install all necessary libraries including:
+- TensorFlow for deep learning
+- Flask for web application
+- Other required dependencies
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Project Structure
 
-## Learn More
+```plaintext
+melanoma-skin-detection/
+├── .gitignore           # Git ignore file
+├── README.md           # Project documentation
+├── main.py            # Main application file
+├── model.h5           # Trained model file
+├── requirements.txt   # Project dependencies
+├── skin_cancer_detection.py  # Detection logic
+└── templates/         # HTML templates
+    └── index.html    # Main web interface
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Running the Application
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+1. Make sure your virtual environment is activated
 
-### Code Splitting
+2. Start the FastAPI pplication:
+```bash
+uvicorn main:app --reload
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Accessing the Application
 
-### Analyzing the Bundle Size
+Once the application is running:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+1. Open your web browser
+2. Navigate to `http://localhost:5000` or `http://127.0.0.1:5000`
+3. You should see the skin cancer detection interface where you can upload images for analysis
 
-### Making a Progressive Web App
+## Usage
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+1. Access the web interface through your browser
+2. Upload a skin image using the provided interface
+3. Click the submit/analyze button
+4. Wait for the system to process and display the results
 
-### Advanced Configuration
+## Important Notes
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- Make sure to use high-quality images for better prediction accuracy
+- The system works best with clear, well-lit images of skin lesions
+- This tool is for educational purposes and should not replace professional medical advice
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
