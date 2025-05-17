@@ -154,7 +154,7 @@ const MelanomaDetection = () => {
     try {
       const arrayBuffer = await selectedImage.arrayBuffer();
   
-      const response = await fetch(`/upload_training_image/${classIdx}`, {
+      const response = await fetch(`https://meldetect.onrender.com/upload_training_image/${classIdx}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/octet-stream",
@@ -584,7 +584,6 @@ const MelanomaDetection = () => {
               image={preview}
               onClose={() => {
                 setShowReport(false);
-                setResult(null);
               }}
             />
           )}

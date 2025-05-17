@@ -6,6 +6,12 @@ from PIL import Image
 import numpy as np
 import skin_cancer_detection as SCD
 import io
+import os
+import uuid
+import asyncio
+from datetime import datetime
+import tensorflow as tf
+from tensorflow.keras.callbacks import EarlyStopping
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -44,7 +50,7 @@ async def predict(request: Request):
 @app.post("/upload_training_image/{class_idx}")
 async def upload_training_image(class_idx: int, request: Request):
     image_data = await request.body()
-    img = Image.open(io.BytesIO(image_data)).resize((28, 28))
+    img = Image.open(io.BytesIO(image_data))
 
     # Save image with class_idx in filename
     filename = f"{class_idx}_{uuid.uuid4().hex}.png"
@@ -52,7 +58,7 @@ async def upload_training_image(class_idx: int, request: Request):
     img.save(filepath)
 
     # Check if enough images collected for retraining
-    if len(os.listdir(NEW_TRAINING_DIR)) >= 50:
+    if len(os.listdir(NEW_TRAINING_DIR)) >= 100:
         asyncio.create_task(run_retraining())
 
     return {"message": "Image saved for training", "filename": filename}
