@@ -5,7 +5,7 @@ from tensorflow.keras.models import Sequential
 classes = {
     0: ("actinic keratoses and intraepithelial carcinomae(Cancer)"),
     1: ("basal cell carcinoma(Cancer)"),
-    2: ("benign keratosis lesions(Cancer)"),
+    2: ("keratosis lesions(Cancer)"),
     3: ("dermatofibroma(Cancer)"),
     4: ("melanocytic nevi(Non-Cancerous)"),
     5: ("pyogenic granulomas and hemorrhage(Can lead to cancer)"),
