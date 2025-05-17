@@ -145,6 +145,33 @@ const MelanomaDetection = () => {
       // Start reading the file
       reader.readAsArrayBuffer(file);
   };
+  const handleUploadImage = async (selectedImage, classIdx) => {
+    if (!selectedImage) {
+      alert("No image selected to upload!");
+      return;
+    }
+  
+    try {
+      const arrayBuffer = await selectedImage.arrayBuffer();
+  
+      const response = await fetch(`/upload_training_image/${classIdx}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        body: arrayBuffer,
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+  
+      const data = await response.json();
+      alert(`Image uploaded successfully! Filename: ${data.filename}`);
+    } catch (error) {
+      alert(`Error uploading image: ${error.message}`);
+    }
+  };
   
   
 
@@ -220,14 +247,6 @@ const MelanomaDetection = () => {
       month: 'long', 
       day: 'numeric' 
     });
-
-    // Function to categorize the risk level based on predicted class
-    const getRiskLevel = () => {
-        if (result?.predicted_class.includes("non-")) {
-          return "Low Risk";
-        }
-        return "High Risk";
-    };
 
     return (
       <motion.div 
@@ -462,21 +481,11 @@ const MelanomaDetection = () => {
                   className={`upload-method-btn ${!isWebcamActive ? 'active' : ''}`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => isWebcamActive && stopWebcam()}
+                  onClick={() => handleUploadImage(image,result.predicted_class.toLowerCase().includes('non-')? 0 : 1)}
                 >
                   <span className="method-icon">📁</span>
                   Upload Image
                 </motion.button>
-                {/* <motion.button 
-                  className={`upload-method-btn ${isWebcamActive ? 'active' : ''}`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={startWebcam}
-                >
-                  <span className="method-icon">📹</span>
-                  Use Webcam
-
-                </motion.button> */}
               </div>
 
               {!isWebcamActive && !preview && (
